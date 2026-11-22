@@ -21,6 +21,20 @@ export const WEATHER_OPTIONS: Option[] = [
   { key: 'snowy', label: 'ゆき' },
 ];
 
+/** 癒され度（1〜5）。0 は「まだ記録していない」 */
+export const HEAL_LEVELS = [
+  { value: 1, label: 'あまり' },
+  { value: 2, label: 'すこし' },
+  { value: 3, label: 'まあまあ' },
+  { value: 4, label: '癒された' },
+  { value: 5, label: 'とても癒された' },
+];
+
+export const healLabel = (v: number): string => HEAL_LEVELS.find((h) => h.value === v)?.label ?? '';
+
+/** ●●●○○ のような5段階の表示 */
+export const healMeter = (v: number): string => '●'.repeat(Math.round(v)) + '○'.repeat(5 - Math.round(v));
+
 export const FIND_KINDS: Option[] = [
   { key: 'flower', label: '花' },
   { key: 'tree', label: '木・葉っぱ' },

@@ -6,16 +6,16 @@ import { todayKey, labelOf, monthKey, daysInMonth } from './dates';
 import {
   subscribeParks, subscribeVisits, subscribeFinds, subscribeDays,
   createPark, updatePark, deletePark, saveWishes, saveSeasons,
-  createVisit, updateVisit, deleteVisit, createFind, updateFind, deleteFind,
+  createVisit, updateVisit, deleteVisit, setVisitHeal, createFind, updateFind, deleteFind,
   saveDraw, setDrawDone, newId, MAX_WISHES, MAX_SEASONS, MAX_ITEM, VisitInput, FindInput,
 } from './store';
 import {
   visitsOf, countByPark, monthCount, weekStreak, lastVisitLabel, parkTitle, overallRank,
-  doneOdaiIds, drawOdai, seasonsFor,
+  doneOdaiIds, drawOdai, seasonsFor, healSummary, healRanking, formatAvg, unratedRecent,
 } from './stats';
 import {
   WITH_OPTIONS, WEATHER_OPTIONS, FIND_KINDS, PARK_EXAMPLES, WISH_EXAMPLES, ODAI, XP,
-  optionLabel, odaiById, Option,
+  optionLabel, odaiById, Option, HEAL_LEVELS, healLabel, healMeter,
 } from './data';
 import { compressPhoto } from './photo';
 import { DayDraw, Find, Park, Visit } from './types';
@@ -103,6 +103,7 @@ const state = {
   visitEditingId: null as string | null,
   visitWith: '',
   visitWeather: '',
+  visitHeal: 0,
   findEditingId: null as string | null,
   findKind: 'flower',
   findPhoto: '',
@@ -217,7 +218,7 @@ async function checkIn(park: Park): Promise<void> {
   if (!uid) return;
   const before = visitsOf(state.visits, park.id).length;
   const ok = await run(`checkin:${park.id}`, async () => {
-    await createVisit(uid, { parkId: park.id, date: todayKey(), withWho: '', weather: '', note: '' });
+    await createVisit(uid, { parkId: park.id, date: todayKey(), withWho: '', weather: '', heal: 0, note: '' });
     track('visit_checkin');
   }, '記録に失敗しました。もう一度お試しください');
   if (!ok) return;
@@ -264,6 +265,8 @@ function renderHome(): void {
       return b;
     }));
   }
+
+  renderHealAsk();
 
   const t = new Date();
   $('stat-total').textContent = String(state.visits.length);
@@ -380,12 +383,96 @@ function visitCard(v: Visit): HTMLElement {
       textEl('span', 'visit-card__date', labelOf(v.date)),
       textEl('span', 'visit-card__park', parkName(v.parkId)),
     ]),
+    v.heal ? healBadge(v.heal) : null,
     meta ? textEl('span', 'visit-card__meta', meta) : null,
     v.note ? textEl('span', 'visit-card__note', v.note) : textEl('span', 'visit-card__add', 'タップして、ひとことを残す'),
   ]);
   (card as HTMLButtonElement).type = 'button';
   card.addEventListener('click', () => openVisitModal(v, null));
   return card;
+}
+
+// ============================================================
+// 癒され度
+// ============================================================
+function healBadge(heal: number): HTMLElement {
+  return el('span', `heal-badge heal-badge--${heal}`, [
+    textEl('span', 'heal-badge__meter', healMeter(heal)),
+    textEl('span', 'heal-badge__label', healLabel(heal)),
+  ]);
+}
+
+/** 今日・きのうの来園で、まだ癒され度を記録していないものに「どれくらい癒された？」を出す */
+function renderHealAsk(): void {
+  const box = $('heal-ask');
+  const targets = state.loaded ? unratedRecent(state.visits).slice(0, 3) : [];
+  box.replaceChildren(...targets.map((v) => {
+    const key = `heal:${v.id}`;
+    const when = v.date === todayKey() ? '今日の' : 'きのうの';
+    const buttons = HEAL_LEVELS.map((h) => {
+      const b = el('button', 'heal-ask__btn', [
+        textEl('span', 'heal-ask__num', String(h.value)),
+        textEl('span', 'heal-ask__label', h.label),
+      ]) as HTMLButtonElement;
+      b.type = 'button';
+      b.disabled = state.pending.has(key);
+      b.setAttribute('aria-label', `${h.value}：${h.label}`);
+      b.addEventListener('click', () => { void rateHeal(v, h.value); });
+      return b;
+    });
+    return el('div', 'heal-ask', [
+      textEl('p', 'heal-ask__q', `${when}${parkName(v.parkId)}、どれくらい癒された？`),
+      el('div', 'heal-ask__scale', buttons),
+    ]);
+  }));
+}
+
+async function rateHeal(visit: Visit, heal: number): Promise<void> {
+  const uid = state.uid;
+  if (!uid) return;
+  const ok = await run(`heal:${visit.id}`, async () => {
+    await setVisitHeal(uid, visit.id, heal);
+    track('heal_rate', { heal });
+  }, '保存に失敗しました。もう一度お試しください');
+  if (!ok) return;
+  if (heal === 5) {
+    celebrate(18);
+    showToast(`とても癒された！ ${parkName(visit.parkId)}の記録に残しました`);
+  } else {
+    showToast(`癒され度「${healLabel(heal)}」を記録しました`);
+  }
+}
+
+function renderHealStats(monthVisits: Visit[]): void {
+  const month = healSummary(monthVisits);
+  $('heal-month-avg').textContent = month.rated ? formatAvg(month.avg) : '-';
+  $('heal-month-best').textContent = String(month.best);
+  $('heal-month-rated').textContent = String(month.rated);
+
+  const ranking = healRanking(state.parks, state.visits);
+  const list = $('heal-ranking');
+  if (ranking.length === 0) {
+    list.replaceChildren(textEl('p', 'muted-text', '来園したら「どれくらい癒された？」を記録してみましょう。公園ごとの平均がここに並びます'));
+    return;
+  }
+  list.replaceChildren(...ranking.map((r, i) => {
+    const fill = textEl('span', 'heal-ranking__fill', '');
+    fill.style.width = `${Math.round((r.summary.avg / 5) * 100)}%`;
+    const row = el('button', 'heal-ranking__row', [
+      textEl('span', 'heal-ranking__rank', `${i + 1}`),
+      el('span', 'heal-ranking__body', [
+        el('span', 'heal-ranking__top', [
+          textEl('span', 'heal-ranking__name', r.park.name),
+          textEl('span', 'heal-ranking__avg', formatAvg(r.summary.avg)),
+        ]),
+        el('span', 'heal-ranking__bar', [fill]),
+        textEl('span', 'heal-ranking__meta', `${r.summary.rated}回記録・とても癒された ${r.summary.best}回`),
+      ]),
+    ]);
+    (row as HTMLButtonElement).type = 'button';
+    row.addEventListener('click', () => openDetail(r.park.id));
+    return row;
+  }));
 }
 
 // ============================================================
@@ -408,6 +495,7 @@ function renderParks(): void {
     const visits = visitsOf(state.visits, p.id);
     const title = parkTitle(visits.length);
     const wishDone = p.wishes.filter((w) => w.doneDate).length;
+    const heal = healSummary(visits);
     const card = el('button', 'park-card', [
       el('span', 'park-card__top', [
         textEl('span', 'park-card__name', p.name),
@@ -417,6 +505,7 @@ function renderParks(): void {
         textEl('span', 'pill pill--primary', title.rank.name),
         textEl('span', 'pill', lastVisitLabel(visits)),
         p.wishes.length ? textEl('span', 'pill', `やってみたい ${wishDone}/${p.wishes.length}`) : null,
+        heal.rated ? textEl('span', 'pill pill--heal', `癒され度 ${formatAvg(heal.avg)}`) : null,
       ]),
       el('span', 'park-card__bar', [(() => {
         const f = textEl('span', 'park-card__fill', '');
@@ -442,9 +531,11 @@ function renderDetail(): void {
   }
   const visits = visitsOf(state.visits, park.id);
   const finds = state.finds.filter((f) => f.parkId === park.id);
+  const detailHeal = healSummary(visits);
   $('detail-name').textContent = park.name;
   $('detail-meta').textContent = visits.length
     ? `${visits.length}回・最初に来た日 ${shortDate(visits[visits.length - 1].date)}・${lastVisitLabel(visits)}`
+      + (detailHeal.rated ? `・癒され度 平均${formatAvg(detailHeal.avg)}` : '')
     : 'まだ来園の記録はありません';
   const memo = $('detail-memo');
   memo.classList.toggle('hidden', !park.memo);
@@ -647,12 +738,13 @@ function renderLog(): void {
   for (let d = 1; d <= daysInMonth(y, m0); d++) {
     const key = `${ym}-${String(d).padStart(2, '0')}`;
     const vs = byDay.get(key) ?? [];
-    const cell = el('button', `calendar__cell${vs.length ? ' has-visit' : ''}${key === today ? ' is-today' : ''}${key === state.calSelected ? ' is-selected' : ''}`, [
+    const dayHeal = Math.max(0, ...vs.map((v) => v.heal));
+    const cell = el('button', `calendar__cell${vs.length ? ' has-visit' : ''}${dayHeal ? ` heal-${dayHeal}` : ''}${key === today ? ' is-today' : ''}${key === state.calSelected ? ' is-selected' : ''}`, [
       textEl('span', 'calendar__day', String(d)),
       vs.length ? textEl('span', 'calendar__dot', vs.length > 1 ? `${vs.length}` : '●') : null,
     ]);
     (cell as HTMLButtonElement).type = 'button';
-    cell.setAttribute('aria-label', `${m0 + 1}月${d}日${vs.length ? ` ${vs.length}回来園` : ''}`);
+    cell.setAttribute('aria-label', `${m0 + 1}月${d}日${vs.length ? ` ${vs.length}回来園` : ''}${dayHeal ? ` ${healLabel(dayHeal)}` : ''}`);
     cell.addEventListener('click', () => {
       state.calSelected = state.calSelected === key ? '' : key;
       renderLog();
@@ -664,6 +756,8 @@ function renderLog(): void {
   const counts = countByPark(monthVisits);
   $('month-parks').replaceChildren(...state.parks.filter((p) => counts.get(p.id)).map((p) =>
     textEl('span', 'pill pill--primary', `${p.name} ${counts.get(p.id)}回`)));
+
+  renderHealStats(monthVisits);
 
   const shown = state.calSelected ? monthVisits.filter((v) => v.date === state.calSelected) : monthVisits;
   $('month-count').textContent = state.calSelected ? `${labelOf(state.calSelected)} ${shown.length}回` : `${monthVisits.length}回`;
@@ -783,6 +877,8 @@ btnParkDelete.addEventListener('click', () => {
 function renderVisitChips(): void {
   renderChips($('visit-with'), WITH_OPTIONS, state.visitWith, (k) => { state.visitWith = k; renderVisitChips(); });
   renderChips($('visit-weather'), WEATHER_OPTIONS, state.visitWeather, (k) => { state.visitWeather = k; renderVisitChips(); });
+  renderChips($('visit-heal'), HEAL_LEVELS.map((h) => ({ key: String(h.value), label: h.label })), state.visitHeal ? String(state.visitHeal) : '',
+    (k) => { state.visitHeal = Number(k) || 0; renderVisitChips(); });
 }
 
 function openVisitModal(visit: Visit | null, parkId: string | null): void {
@@ -798,6 +894,7 @@ function openVisitModal(visit: Visit | null, parkId: string | null): void {
   inputVisitNote.value = visit?.note ?? '';
   state.visitWith = visit?.withWho ?? '';
   state.visitWeather = visit?.weather ?? '';
+  state.visitHeal = visit?.heal ?? 0;
   renderVisitChips();
   btnVisitDelete.classList.toggle('hidden', !visit);
   openOverlay(visitOverlay);
@@ -813,6 +910,7 @@ visitForm.addEventListener('submit', async (e) => {
     date: inputVisitDate.value,
     withWho: state.visitWith,
     weather: state.visitWeather,
+    heal: state.visitHeal,
     note: inputVisitNote.value,
   };
   if (!parkById(input.parkId)) {

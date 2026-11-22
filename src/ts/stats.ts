@@ -81,3 +81,34 @@ export function seasonsFor(parks: Park[], month: number): { park: Park; text: st
   }));
   return out;
 }
+
+// ============================================================
+// 癒され度
+// ============================================================
+export interface HealSummary {
+  rated: number; // 記録した回数
+  avg: number; // 平均（記録なしは 0）
+  best: number; // 「とても癒された」の回数
+}
+
+export function healSummary(visits: Visit[]): HealSummary {
+  const rated = visits.filter((v) => v.heal > 0);
+  const sum = rated.reduce((n, v) => n + v.heal, 0);
+  return { rated: rated.length, avg: rated.length ? sum / rated.length : 0, best: rated.filter((v) => v.heal === 5).length };
+}
+
+/** 平均の癒され度が高い順の公園（記録がある公園のみ） */
+export function healRanking(parks: Park[], visits: Visit[]): { park: Park; summary: HealSummary }[] {
+  return parks
+    .map((park) => ({ park, summary: healSummary(visitsOf(visits, park.id)) }))
+    .filter((r) => r.summary.rated > 0)
+    .sort((a, b) => b.summary.avg - a.summary.avg || b.summary.rated - a.summary.rated);
+}
+
+export const formatAvg = (n: number): string => n.toFixed(1);
+
+/** 癒され度をまだ記録していない、今日・きのうの来園 */
+export function unratedRecent(visits: Visit[]): Visit[] {
+  const since = addDays(todayKey(), -1);
+  return visits.filter((v) => v.heal === 0 && v.date >= since);
+}

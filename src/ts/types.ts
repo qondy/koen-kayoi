@@ -31,6 +31,7 @@ export interface Visit {
   date: string; // YYYY-MM-DD
   withWho: string; // WITH_OPTIONS の key（空文字 = 未選択）
   weather: string; // WEATHER_OPTIONS の key（空文字 = 未選択）
+  heal: number; // 癒され度 1〜5（0 = まだ記録していない）
   note: string;
   createdAt: number;
 }

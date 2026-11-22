@@ -28,6 +28,8 @@ const clip = (s: string, max: number): string => s.trim().slice(0, max);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? v as Record<string, unknown> : {});
 const oneOf = (v: unknown, keys: string[]): string => (typeof v === 'string' && keys.includes(v) ? v : '');
+/** 癒され度 1〜5（それ以外は 0 = 未記録） */
+const healOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5 ? v : 0);
 
 const WITH_KEYS = WITH_OPTIONS.map((o) => o.key);
 const WEATHER_KEYS = WEATHER_OPTIONS.map((o) => o.key);
@@ -103,6 +105,7 @@ export function subscribeVisits(uid: string, onData: (items: Visit[]) => void, o
         date,
         withWho: oneOf(data.withWho, WITH_KEYS),
         weather: oneOf(data.weather, WEATHER_KEYS),
+        heal: healOf(data.heal),
         note: str(data.note).slice(0, MAX_NOTE),
         createdAt: millis(data.createdAt),
       });
@@ -205,6 +208,7 @@ export interface VisitInput {
   date: string;
   withWho: string;
   weather: string;
+  heal: number;
   note: string;
 }
 
@@ -214,6 +218,7 @@ function visitPayload(input: VisitInput) {
     date: dateStr(input.date),
     withWho: oneOf(input.withWho, WITH_KEYS),
     weather: oneOf(input.weather, WEATHER_KEYS),
+    heal: healOf(input.heal),
     note: clip(input.note, MAX_NOTE),
   };
 }
@@ -224,6 +229,11 @@ export async function createVisit(uid: string, input: VisitInput): Promise<void>
 
 export function updateVisit(uid: string, id: string, input: VisitInput): Promise<void> {
   return updateDoc(ref(uid, 'visits', id), visitPayload(input));
+}
+
+/** 癒され度だけを保存する（「きょう」の画面からワンタップで記録する用） */
+export function setVisitHeal(uid: string, id: string, heal: number): Promise<void> {
+  return updateDoc(ref(uid, 'visits', id), { heal: healOf(heal) });
 }
 
 export function deleteVisit(uid: string, id: string): Promise<void> {

@@ -971,3 +971,225 @@
   align-items: center;
   justify-content: center;
 }
+
+// ===== 癒され度 =====
+// 5段階の濃さ（1=うすい → 5=こい）。ブランドのみどりから作る
+$heal-shades: (
+  1: mix($color-primary, #fff, 12%),
+  2: mix($color-primary, #fff, 24%),
+  3: mix($color-primary, #fff, 40%),
+  4: mix($color-primary, #fff, 62%),
+  5: $color-primary,
+);
+
+.heal-ask-list:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
+}
+
+.heal-ask {
+  padding: $spacing-md;
+  border-radius: $radius-lg;
+  background: $color-primary-soft;
+  border: 1px solid $color-surface-3;
+
+  &__q {
+    font-size: $font-size-sm;
+    font-weight: 800;
+    margin-bottom: $spacing-sm;
+    overflow-wrap: anywhere;
+  }
+
+  &__scale {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  &__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 6px 2px;
+    border-radius: $radius-md;
+    background: $color-surface;
+    border: 1px solid $color-border;
+    transition: transform 0.1s ease, border-color 0.15s ease;
+
+    &:hover {
+      border-color: $color-primary;
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+    }
+
+    @each $level, $shade in $heal-shades {
+      &:nth-child(#{$level}) .heal-ask__num {
+        background: $shade;
+        @if $level >= 4 {
+          color: #fff;
+        }
+      }
+    }
+  }
+
+  &__num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: $font-size-sm;
+    font-weight: 800;
+    color: $color-primary-ink;
+  }
+
+  &__label {
+    font-size: $font-size-xs;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    color: $color-text-muted;
+  }
+}
+
+.heal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: $color-primary-soft;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  color: $color-primary-ink;
+
+  &__meter {
+    letter-spacing: 1px;
+  }
+}
+
+.pill--heal {
+  background: $color-primary-ink;
+  color: #fff;
+}
+
+.calendar__cell {
+  @each $level, $shade in $heal-shades {
+    &.heal-#{$level} {
+      background: $shade;
+      @if $level >= 4 {
+        .calendar__day,
+        .calendar__dot {
+          color: #fff;
+        }
+      }
+    }
+  }
+}
+
+.heal-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  &__title {
+    font-size: $font-size-sm;
+    font-weight: 700;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    width: 100%;
+    padding: 12px $spacing-md;
+    border-radius: $radius-md;
+    background: $color-surface;
+    border: 1px solid $color-border;
+    text-align: left;
+
+    &:hover {
+      border-color: $color-primary;
+    }
+  }
+
+  &__rank {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: $color-surface-2;
+    font-size: $font-size-sm;
+    font-weight: 800;
+    color: $color-primary-ink;
+  }
+
+  &__row:first-child &__rank {
+    background: $color-primary-ink;
+    color: #fff;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: $spacing-sm;
+  }
+
+  &__name {
+    font-size: $font-size-base;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  &__avg {
+    font-size: $font-size-lg;
+    font-weight: 800;
+    color: $color-primary-ink;
+  }
+
+  &__bar {
+    display: block;
+    height: 8px;
+    border-radius: 999px;
+    background: $color-surface-2;
+    overflow: hidden;
+  }
+
+  &__fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: $color-primary;
+  }
+
+  &__meta {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+}

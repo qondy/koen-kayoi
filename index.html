@@ -84,6 +84,7 @@
             <p class="section__desc">着いたら、公園の名前をタップするだけで記録できます</p>
           </div>
           <div id="checkin-list" class="checkin-list"></div>
+          <div id="heal-ask" class="heal-ask-list"></div>
         </div>
 
         <div class="stat-row">
@@ -217,6 +218,19 @@
         <div id="calendar" class="calendar"></div>
         <div id="month-parks" class="month-parks"></div>
         <div class="section">
+          <div class="section__head">
+            <h3 class="section__title">癒しの記録</h3>
+            <p class="section__desc">来園ごとの「どれくらい癒された？」から集計します。カレンダーは癒された日ほど濃いみどりになります</p>
+          </div>
+          <div class="stat-row">
+            <div class="stat-card"><div class="stat-card__value" id="heal-month-avg">-</div><div class="stat-card__label">この月の平均</div></div>
+            <div class="stat-card"><div class="stat-card__value" id="heal-month-best">0</div><div class="stat-card__label">とても癒された</div></div>
+            <div class="stat-card"><div class="stat-card__value" id="heal-month-rated">0</div><div class="stat-card__label">記録した回数</div></div>
+          </div>
+          <p class="heal-ranking__title">いちばん癒される公園（これまでの平均）</p>
+          <div id="heal-ranking" class="heal-ranking"></div>
+        </div>
+        <div class="section">
           <div class="section__head section__head--row">
             <h3 class="section__title">この月の来園 <span class="section__count" id="month-count"></span></h3>
             <button type="button" id="btn-add-visit" class="btn btn--ghost btn--sm">＋ 前の日を記録</button>
@@ -275,6 +289,10 @@
       <div class="field">
         <label class="field__label" for="input-visit-date">行った日</label>
         <input type="date" id="input-visit-date" required />
+      </div>
+      <div class="field">
+        <span class="field__label">どれくらい癒された？<span class="field__hint">任意</span></span>
+        <div id="visit-heal" class="filter-chips heal-chips"></div>
       </div>
       <div class="field">
         <span class="field__label">だれと<span class="field__hint">任意</span></span>
