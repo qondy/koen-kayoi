@@ -4,6 +4,7 @@
 @import 'memo';
 @import 'wakuwaku';
 @import 'app';
+@import 'souieba';
 
 :root {
   --memo-accent: #{$color-primary-ink};
@@ -15,4 +16,9 @@
   input, textarea, select {
     font-size: 16px !important;
   }
+}
+
+// 「そういえば、これ」カード
+:root {
+  --souieba-accent: #1e8449;
 }

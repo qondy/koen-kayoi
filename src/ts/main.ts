@@ -1,3 +1,4 @@
+import { daysAgoOf, olderThan, renderSouieba, resetSouieba } from './souieba';
 import { User } from 'firebase/auth';
 import { onAuthChange, loginWithGoogle, logout } from './auth';
 import { showToast, openOverlay, closeOverlay, textEl, button } from './ui';
@@ -10,7 +11,7 @@ import {
   saveDraw, setDrawDone, newId, MAX_WISHES, MAX_SEASONS, MAX_ITEM, VisitInput, FindInput,
 } from './store';
 import {
-  visitsOf, countByPark, monthCount, weekStreak, lastVisitLabel, parkTitle, overallRank,
+  daysBetween, visitsOf, countByPark, monthCount, weekStreak, lastVisitLabel, parkTitle, overallRank,
   doneOdaiIds, drawOdai, seasonsFor, healSummary, healRanking, formatAvg, unratedRecent,
 } from './stats';
 import {
@@ -236,7 +237,49 @@ async function checkIn(park: Park): Promise<void> {
 // ============================================================
 // きょう
 // ============================================================
+// しばらく行っていない公園を、1日1件だけ思い出す
+function renderRecall(): void {
+  const box = document.getElementById('souieba-box');
+  const uid = state.uid;
+  if (!box || !uid || !state.loaded) return;
+  const lastDate = (id: string): string =>
+    visitsOf(state.visits, id).reduce((latest, v) => (v.date > latest ? v.date : latest), '');
+  const sinceVisit = (id: string): number | null => {
+    const d = lastDate(id);
+    return d ? daysBetween(d, todayKey()) : null;
+  };
+  renderSouieba({
+    box,
+    storageKey: `koen-souieba:${uid}`,
+    heading: 'そういえば、この公園、しばらく行っていません',
+    items: state.parks.filter((p) => {
+      const days = sinceVisit(p.id);
+      return days === null ? olderThan(p.createdAt, 7) : days >= 30;
+    }),
+    idOf: (p) => p.id,
+    view: (p) => {
+      const days = sinceVisit(p.id);
+      const wish = p.wishes.find((w) => !w.doneDate);
+      return {
+        title: p.name,
+        meta: days === null ? `登録して${daysAgoOf(p.createdAt)}日・まだ記録がありません` : `最後に行ったのは${days}日前・これまで${visitsOf(state.visits, p.id).length}回`,
+        note: wish ? `やってみたいこと：${wish.text}` : p.memo,
+      };
+    },
+    actions: [{
+      label: '公園のページを見る',
+      track: 'souieba_park',
+      primary: true,
+      run: (p) => {
+        window.setTimeout(() => openDetail(p.id), 0);
+        return '次のおさんぽの候補にどうぞ。';
+      },
+    }],
+  });
+}
+
 function renderHome(): void {
+  renderRecall();
   const checkinList = $('checkin-list');
   const counts = countByPark(state.visits);
   const today = todayKey();
@@ -1235,6 +1278,7 @@ onAuthChange((user: User | null) => {
     appEl.classList.add('hidden');
     userInfo.classList.add('hidden');
     [parkOverlay, visitOverlay, findOverlay, confirmOverlay, feedbackOverlay].forEach(closeOverlay);
+    resetSouieba(document.getElementById('souieba-box'));
     return;
   }
   state.uid = user.uid;
